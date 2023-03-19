@@ -68,19 +68,49 @@ extern CfgParams_T sm_cfgParams;
  *     eNOUNFIXEDBUF_BFM - There is no unfixed buffer.
  *     some errors caused by fuction calls
  */
-Four edubfm_AllocTrain(
-    Four 	type)			/* IN type of buffer (PAGE or TRAIN) */
-{
-    Four 	e;			/* for error */
-    Four 	victim;			/* return value */
-    Four 	i;
-    
+Four edubfm_AllocTrain(Four type) {
+    Four e;                 /* for error */
+    Four victim;            /* return value */
+    Four i;
 
-	/* Error check whether using not supported functionality by EduBfM */
-	if(sm_cfgParams.useBulkFlush) ERR(eNOTSUPPORTED_EDUBFM);
+    /* Error check whether using not supported functionality by EduBfM */
+    if (sm_cfgParams.useBulkFlush) ERR(eNOTSUPPORTED_EDUBFM);
 
+    /* Sequentially visit buffer elements in bufferPool */
+    for (i = 0; i < BI_NBUFS(type); i++) {
+        victim = BI_NEXTVICTIM(type);
+        BI_NEXTVICTIM(type) = (BI_NEXTVICTIM(type) + 1) % BI_NBUFS(type);
 
-    
-    return( victim );
-    
+        /* Check if buffer is unfixed */
+        if (BI_FIXED(type, victim) == 0) {
+            /* Check if REFER bit is set */
+            if ( BI_BITS(type, victim) & REFER) {
+                /* Clear REFER bit and continue searching */
+                 BI_BITS(type, victim) &= ~REFER;
+            } else {
+                /* Set victim as selected buffer element */
+                break;
+            }
+        }
+    }
+
+    /* If no buffer element was selected, return error code */
+    if (i >= BI_NBUFS(type)) ERR(eNOUNFIXEDBUF_BFM);
+
+    /* If page/train is dirty, flush contents to disk */
+    if (BI_BITS(type, victim) & DIRTY) {
+        e = edubfm_FlushTrain(victim, type);
+        if (e < eNOERROR) ERR(e);
+    }
+
+    /* Initialize bufTable entry */
+    BI_BITS(type, victim) = 0;
+    BI_NEXTHASHENTRY(type, victim) = NIL;
+
+    /* Update bufInfo.nextVictim and hashTable */
+    BI_NEXTVICTIM(type) = (victim + 1) % bufInfo[type].nBufs;
+    edubfm_Delete(&BI_KEY(type, victim), type);
+
+    /* Return index of allocated buffer element */
+    return victim;
 }  /* edubfm_AllocTrain */

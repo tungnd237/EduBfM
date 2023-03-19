@@ -82,8 +82,9 @@ Four edubfm_Insert(
     Two 		index,			/* IN an index used in the buffer pool */
     Four 		type)			/* IN buffer type */
 {
-    Four 		i;			
+    Four 		i;
     Two  		hashValue;
+    Four  		entry;
 
 
     CHECKKEY(key);    /*@ check validity of key */
@@ -91,7 +92,18 @@ Four edubfm_Insert(
     if( (index < 0) || (index > BI_NBUFS(type)) )
         ERR( eBADBUFINDEX_BFM );
 
-   
+
+    /* get the hash value of the page/train */
+    hashValue = BFM_HASH(key,type);
+
+    /* search for the free entry in hashTable */
+    entry = BI_HASHTABLEENTRY(type, hashValue);
+
+    if(entry != NIL) {
+        /* check for collision */
+        BI_NEXTHASHENTRY(type, index) = entry;
+    }
+    BI_HASHTABLEENTRY(type, hashValue) = index;
 
     return( eNOERROR );
 
@@ -126,9 +138,23 @@ Four edubfm_Delete(
 
     CHECKKEY(key);    /*@ check validity of key */
 
+    /* get the hash value of the page/train */
+    hashValue = BFM_HASH(key,type);
 
+    /* search for the entry in hashTable */
+    i = BI_HASHTABLEENTRY(type, hashValue);
 
-    ERR( eNOTFOUND_BFM );
+    if (i != NIL){
+        prev = i;
+        i = BI_NEXTHASHENTRY(type, i);
+        BI_HASHTABLEENTRY(type, hashValue) = i;
+        BI_NEXTHASHENTRY(type, prev) = NIL;
+    }
+    else{
+        ERR( eNOTFOUND_BFM );
+    }
+    
+    return( eNOERROR );
 
 }  /* edubfm_Delete */
 
@@ -158,16 +184,22 @@ Four edubfm_LookUp(
     Two                 i, j;                   /* indices */
     Two                 hashValue;
 
-
     CHECKKEY(key);    /*@ check validity of key */
 
+    hashValue = BFM_HASH(key,type);
 
+    i = BI_HASHTABLEENTRY(type,hashValue);
+
+    while (i != NIL) {
+        if (EQUALKEY(&BI_KEY(type, i), key)) {
+        return i;
+        }
+        i = BI_NEXTHASHENTRY(type, i);
+    }
 
     return(NOTFOUND_IN_HTABLE);
     
 }  /* edubfm_LookUp */
-
-
 
 /*@================================
  * edubfm_DeleteAll()
@@ -188,8 +220,14 @@ Four edubfm_DeleteAll(void)
 {
     Two 	i;
     Four        tableSize;
-    
+    Four        type;
 
+    for (type = 0; type < 2; i++){
+        tableSize = HASHTABLESIZE(type);
+        for (i = 0; i < tableSize; i++){
+            BI_HASHTABLEENTRY(type,i) = NIL;
+        }
+    }
 
     return(eNOERROR);
 

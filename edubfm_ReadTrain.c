@@ -74,8 +74,10 @@ Four edubfm_ReadTrain(
 
 	/* Error check whether using not supported functionality by EduBfM */
 	if (RM_IS_ROLLBACK_REQUIRED()) ERR(eNOTSUPPORTED_EDUBFM);
-
-
+    
+    /* read the train from disk into the buffer */
+    e = RDsM_ReadTrain(trainId, aTrain, type);
+    if (e < eNOERROR) return e;
 
     return( eNOERROR );
 
