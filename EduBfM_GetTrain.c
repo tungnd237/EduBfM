@@ -68,23 +68,53 @@
  *     pointer to buffer holding the disk train indicated by `trainId'
  */
 Four EduBfM_GetTrain(
-    TrainID             *trainId,               /* IN train to be used */
-    char                **retBuf,               /* OUT pointer to the returned buffer */
-    Four                type )                  /* IN buffer type */
+    TrainID *trainId,  // IN train to be used
+    char **retBuf,      // OUT pointer to the returned buffer
+    Four type)          // IN buffer type
 {
-    Four                e;                      /* for error */
-    Four                index;                  /* index of the buffer pool */
+    Four e;             // for error
+    Four index;         // index of the buffer pool
+    BfMHashKey key;     // hash key for the trainId
+    
+    // Check the validity of given parameters
+    // Some restrictions may be added
+    if (retBuf == NULL) ERR(eBADBUFFER_BFM);
 
+    // Is the buffer type valid?
+    if (IS_BAD_BUFFERTYPE(type)) ERR(eBADBUFFERTYPE_BFM);
 
-    /*@ Check the validity of given parameters */
-    /* Some restrictions may be added         */
-    if(retBuf == NULL) ERR(eBADBUFFER_BFM);
+    // Construct the hash key for the trainId
+    key.pageNo = trainId->pageNo;
+    key.volNo = trainId->volNo;
 
-    /* Is the buffer type valid? */
-    if(IS_BAD_BUFFERTYPE(type)) ERR(eBADBUFFERTYPE_BFM);	
+    // Look up the buffer in the buffer pool using the hash key
+    index = edubfm_LookUp(&key, type);
+    if (index < eNOERROR) ERR(index);
 
+    if (index != NOTFOUND_IN_HTABLE) {
+        // Train found in the buffer pool, update the buffer control block
+        BI_FIXED(type, index)++;
+        BI_BITS(type, index) |= REFER;
+    } else {
+        // Train not found in the buffer pool, allocate a buffer element to store it
+        index = edubfm_AllocTrain(type);
+        if (index < eNOERROR) ERR(index);
 
+        // Read the train from the disk into the buffer
+        e = edubfm_ReadTrain(trainId, *retBuf, type);
+        if (e < eNOERROR) ERR(e);
 
-    return(eNOERROR);   /* No error */
+        // Update the buffer control block
+        BI_KEY(type, index) = key;
+        BI_FIXED(type, index) = 1;
+        BI_BITS(type, index) |= REFER;
 
+        // Insert the buffer element into the hash table
+        e = edubfm_Insert(&key, index, type);
+        if (e < eNOERROR) ERR(e);
+    }
+
+    // Return a pointer to the buffer element
+    *retBuf = BI_BUFFER(type, index);
+    return eNOERROR;   // No error
 }  /* EduBfM_GetTrain() */

@@ -60,19 +60,34 @@
  *  error code
  *    some errors caused by function calls
  */
-Four edubfm_FlushTrain(
-    TrainID 			*trainId,		/* IN train to be flushed */
-    Four   			type)			/* IN buffer type */
-{
-    Four 			e;			/* for errors */
-    Four 			index;			/* for an index */
+Four edubfm_FlushTrain(TrainID *trainId, Four type) {
+    Four e;      // for errors
+    Four index;  // for an index
 
+    /* Error check whether using not supported functionality by EduBfM */
+    if (RM_IS_ROLLBACK_REQUIRED()) {
+        return eNOTSUPPORTED_EDUBFM;
+    }
+    
+    BfMHashKey hashKey;
+    hashKey.volNo = trainId->volNo;
+    hashKey.pageNo = trainId->pageNo;
+    // Construct a hash key using the TrainID 'trainId' to look up the buffer in the buffer pool
+    index = edubfm_LookUp(&hashKey, type);
+    if (index < 0) {
+        // The train does not exist in bufferPool
+        return eNOTFOUND_BFM;
+    }
 
-	/* Error check whether using not supported functionality by EduBfM */
-	if (RM_IS_ROLLBACK_REQUIRED()) ERR(eNOTSUPPORTED_EDUBFM);
+    // Write out the page/train into the disk if DIRTY bit is set to 1
+    if (BI_BITS(type, index) & DIRTY) {
+        e = RDsM_WriteTrain(BI_BUFFER(type, index), trainId, 1);
+        if (e < 0) {
+            return e;
+        }
+        // Reset the DIRTY bit
+        BI_BITS(type, index) &= ~DIRTY;
+    }
 
-
-	
-    return( eNOERROR );
-
-}  /* edubfm_FlushTrain */
+    return eNOERROR;
+} /* edubfm_FlushTrain */
