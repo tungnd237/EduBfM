@@ -80,22 +80,18 @@ Four edubfm_AllocTrain(
     if(sm_cfgParams.useBulkFlush) ERR(eNOTSUPPORTED_EDUBFM);
 
     secondChanceCount = 0;
-    i = BI_NEXTVICTIM(type);
-
+    victim = BI_NEXTVICTIM(type);
     /* Second chance buffer replacement algorithm */
     while (secondChanceCount < 2 * BI_NBUFS(type) ) {
-        victim = i % BI_NBUFS(type) ;
-
         if (BI_FIXED(type, victim) == 0) { // Unfixed buffer element found
             if (BI_BITS(type, victim) & REFER) { // REFER bit is set
-                BI_BITS(type, victim) &= ~REFER; // Reset REFER bit
+                BI_BITS(type, victim) &= ~REFER; // Reset REFER bit to 0
             } else { // REFER bit is not set, buffer element can be allocated
                 break;
             }
         }
-
         secondChanceCount++;
-        i++;
+        victim = (victim +1) % BI_NBUFS(type);
     }
 
     if (secondChanceCount >= 2 * BI_NBUFS(type) ) {

@@ -129,7 +129,7 @@ typedef struct {
  * Description: return an array index of the next buffer element(next victim) to be visited to determine whether or not to replace the buffer element by the buffer replacement algorithm
  * Parameter:
  *  Four type       : buffer type
- * Returns: (UTwo) an array index of the next victim
+ * Returns: (Two) an array index of the next victim
  */
 #define BI_NEXTVICTIM(type)	     (bufInfo[type].nextVictim)
 
