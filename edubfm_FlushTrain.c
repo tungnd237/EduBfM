@@ -81,7 +81,7 @@ Four edubfm_FlushTrain(TrainID *trainId, Four type) {
 
     // Write out the page/train into the disk if DIRTY bit is set to 1
     if (BI_BITS(type, index) & DIRTY) {
-        e = RDsM_WriteTrain(BI_BUFFER(type, index), trainId, 1);
+        e = RDsM_WriteTrain(BI_BUFFER(type, index), trainId, BI_BUFSIZE(type));
         if (e < 0) {
             return e;
         }

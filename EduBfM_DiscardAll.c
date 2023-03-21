@@ -59,7 +59,20 @@ Four EduBfM_DiscardAll(void)
     Two 	i;			/* index */
     Four 	type;			/* buffer type */
 
+    /* Iterate over all buffer types */
+    for (type = 0; type < 2; type++) {
+        /* Iterate over all buffer elements */
+        for (i = 0; i < BI_NBUFS(type); i++) {
+            /* Initialize the key */
+            BI_KEY(type, i).pageNo = NIL;
 
+            /* Reset all bits */
+            BI_BITS(type, i) = 0;
+        }
+    }
+    /* Delete all entries in the hashTable */
+    e = edubfm_DeleteAll();
+    if (e < eNOERROR) ERR(e);
 
     return(eNOERROR);
 

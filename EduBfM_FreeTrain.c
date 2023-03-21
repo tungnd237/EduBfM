@@ -64,10 +64,26 @@ Four EduBfM_FreeTrain(
     Four 		e;		/* error code */
 
     /*@ check if the parameter is valid. */
-    if (IS_BAD_BUFFERTYPE(type)) ERR(eBADBUFFERTYPE_BFM);	
+    if (IS_BAD_BUFFERTYPE(type)) ERR(eBADBUFFERTYPE_BFM);
 
+    /* Find the index of the buffer element containing the train using its hash value */
+    e = edubfm_LookUp(trainId, type);
+    if (e < eNOERROR) ERR(e);
 
-    
+    if (e == NOTFOUND_IN_HTABLE) {
+        return eNOTFOUND_BFM;
+    }
+    index = e;
+
+    /* Decrease the fixed variable of the buffer element by 1 */
+    BI_FIXED(type, index) -= 1;
+
+    /* If the value of fixed becomes less than 0 */
+    if (BI_FIXED(type, index) < 0) {
+        printf("Warning: Fixed counter is less than 0!!!\n");
+        BI_FIXED(type, index) = 0;
+    }
+
     return( eNOERROR );
     
 } /* EduBfM_FreeTrain() */

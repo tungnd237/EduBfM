@@ -65,12 +65,23 @@ Four EduBfM_SetDirty(
     Four                type )                  /* IN buffer type */
 {
     Four                index;                  /* an index of the buffer table & pool */
+    Four                e;                      /* error code */
 
-
-    /*@ Is the paramter valid? */
+    /*@ Is the parameter valid? */
     if (IS_BAD_BUFFERTYPE(type)) ERR(eBADBUFFERTYPE_BFM);
 
+    /* Find the index of the buffer element containing the train using its hash value */
+    e = edubfm_LookUp(trainId, type);
+    if (e < eNOERROR) ERR(e);
 
+    if (e == NOTFOUND_IN_HTABLE) {
+        return eNOTFOUND_BFM;
+    }
+
+    index = e;
+
+    /* Set the DIRTY bit of the buffer element to 1 */
+    BI_BITS(type, index) |= DIRTY;
 
     return( eNOERROR );
 

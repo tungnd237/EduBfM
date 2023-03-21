@@ -78,32 +78,30 @@
  *    eBADBUFINDEX_BFM - bad index value for buffer table
  */
 Four edubfm_Insert(
-    BfMHashKey 		*key,			/* IN a hash key in Buffer Manager */
-    Two 		index,			/* IN an index used in the buffer pool */
-    Four 		type)			/* IN buffer type */
+    BfMHashKey       *key,           /* IN a hash key in Buffer Manager */
+    Two              index,          /* IN an index used in the buffer pool */
+    Four             type)           /* IN buffer type */
 {
-    Four 		i;
-    Two  		hashValue;
-    Four  		entry;
-
+    Four            i;            
+    Two             hashValue;
 
     CHECKKEY(key);    /*@ check validity of key */
 
     if( (index < 0) || (index > BI_NBUFS(type)) )
         ERR( eBADBUFINDEX_BFM );
 
+    // Calculate the hash value using the hash function
+    hashValue = BFM_HASH(key, type);
 
-    /* get the hash value of the page/train */
-    hashValue = BFM_HASH(key,type);
-
-    /* search for the free entry in hashTable */
-    entry = BI_HASHTABLEENTRY(type, hashValue);
-
-    if(entry != NIL) {
-        /* check for collision */
-        BI_NEXTHASHENTRY(type, index) = entry;
+    // If there is a collision, handle it using the chaining method
+    if (BI_HASHTABLEENTRY(type,hashValue) != NIL) {
+        BI_NEXTHASHENTRY(type, index) = BI_HASHTABLEENTRY(type,hashValue);
+    } else {
+        BI_NEXTHASHENTRY(type, index) = NIL;
     }
-    BI_HASHTABLEENTRY(type, hashValue) = index;
+
+    // Insert the buffer element index into the hashTable
+    BI_HASHTABLEENTRY(type,hashValue) = index;
 
     return( eNOERROR );
 
@@ -135,26 +133,34 @@ Four edubfm_Delete(
     Two                 i, prev;                
     Two                 hashValue;
 
-
     CHECKKEY(key);    /*@ check validity of key */
 
-    /* get the hash value of the page/train */
+    // Calculate the hash value
     hashValue = BFM_HASH(key,type);
 
-    /* search for the entry in hashTable */
+    // Initialize i and prev
     i = BI_HASHTABLEENTRY(type, hashValue);
+    prev = NIL;
 
-    if (i != NIL){
+    // Search for the entry in the hashTable
+    while (i != NIL) {
+        if (EQUALKEY(&BI_KEY(type, i), key)) {
+            // Found the entry to be deleted
+            if (prev == NIL) {
+                // The entry is the first one in the list
+                BI_HASHTABLEENTRY(type, hashValue) = BI_NEXTHASHENTRY(type, i);
+            } else {
+                // The entry is in the middle or at the end of the list
+                BI_NEXTHASHENTRY(type, prev) = BI_NEXTHASHENTRY(type, i);
+            }
+            return eNOERROR;
+        }
         prev = i;
         i = BI_NEXTHASHENTRY(type, i);
-        BI_HASHTABLEENTRY(type, hashValue) = i;
-        BI_NEXTHASHENTRY(type, prev) = NIL;
     }
-    else{
-        ERR( eNOTFOUND_BFM );
-    }
-    
-    return( eNOERROR );
+
+    // Entry not found
+    ERR( eNOTFOUND_BFM );
 
 }  /* edubfm_Delete */
 
@@ -220,15 +226,18 @@ Four edubfm_DeleteAll(void)
 {
     Two 	i;
     Four        tableSize;
-    Four        type;
 
-    for (type = 0; type < 2; i++){
+    /* Iterate over all buffer types */
+    for (Four type = 0; type < NUM_BUF_TYPES; type++) {
+        /* Get the size of the hashTable for the current buffer type */
         tableSize = HASHTABLESIZE(type);
-        for (i = 0; i < tableSize; i++){
+
+        /* Set each hashTable entry to NIL(-1) */
+        for (i = 0; i < tableSize; i++) {
             BI_HASHTABLEENTRY(type,i) = NIL;
         }
     }
 
     return(eNOERROR);
 
-} /* edubfm_DeleteAll() */ 
+} /* edubfm_DeleteAll() */

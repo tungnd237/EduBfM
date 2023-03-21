@@ -68,49 +68,56 @@ extern CfgParams_T sm_cfgParams;
  *     eNOUNFIXEDBUF_BFM - There is no unfixed buffer.
  *     some errors caused by fuction calls
  */
-Four edubfm_AllocTrain(Four type) {
-    Four e;                 /* for error */
-    Four victim;            /* return value */
-    Four i;
+Four edubfm_AllocTrain(
+    Four 	type)			/* IN type of buffer (PAGE or TRAIN) */
+{
+    Four 	e;			/* for error */
+    Four 	victim;			/* return value */
+    Four 	i;
+    Four 	secondChanceCount;	/* to count second chances given */
 
     /* Error check whether using not supported functionality by EduBfM */
-    if (sm_cfgParams.useBulkFlush) ERR(eNOTSUPPORTED_EDUBFM);
+    if(sm_cfgParams.useBulkFlush) ERR(eNOTSUPPORTED_EDUBFM);
 
-    /* Sequentially visit buffer elements in bufferPool */
-    for (i = 0; i < BI_NBUFS(type); i++) {
-        victim = BI_NEXTVICTIM(type);
-        BI_NEXTVICTIM(type) = (BI_NEXTVICTIM(type) + 1) % BI_NBUFS(type);
+    secondChanceCount = 0;
+    i = BI_NEXTVICTIM(type);
 
-        /* Check if buffer is unfixed */
-        if (BI_FIXED(type, victim) == 0) {
-            /* Check if REFER bit is set */
-            if ( BI_BITS(type, victim) & REFER) {
-                /* Clear REFER bit and continue searching */
-                 BI_BITS(type, victim) &= ~REFER;
-            } else {
-                /* Set victim as selected buffer element */
+    /* Second chance buffer replacement algorithm */
+    while (secondChanceCount < 2 * BI_NBUFS(type) ) {
+        victim = i % BI_NBUFS(type) ;
+
+        if (BI_FIXED(type, victim) == 0) { // Unfixed buffer element found
+            if (BI_BITS(type, victim) & REFER) { // REFER bit is set
+                BI_BITS(type, victim) &= ~REFER; // Reset REFER bit
+            } else { // REFER bit is not set, buffer element can be allocated
                 break;
             }
         }
+
+        secondChanceCount++;
+        i++;
     }
 
-    /* If no buffer element was selected, return error code */
-    if (i >= BI_NBUFS(type)) ERR(eNOUNFIXEDBUF_BFM);
+    if (secondChanceCount >= 2 * BI_NBUFS(type) ) {
+        ERR(eNOUNFIXEDBUF_BFM); // No unfixed buffer element found
+    }
 
-    /* If page/train is dirty, flush contents to disk */
+    // If the buffer element is dirty, flush its contents to disk
     if (BI_BITS(type, victim) & DIRTY) {
-        e = edubfm_FlushTrain(victim, type);
+        e = edubfm_FlushTrain(&BI_KEY(type, victim), type);
         if (e < eNOERROR) ERR(e);
     }
 
-    /* Initialize bufTable entry */
+    // Reset all bits in the buffer element
     BI_BITS(type, victim) = 0;
-    BI_NEXTHASHENTRY(type, victim) = NIL;
 
-    /* Update bufInfo.nextVictim and hashTable */
-    BI_NEXTVICTIM(type) = (victim + 1) % bufInfo[type].nBufs;
-    edubfm_Delete(&BI_KEY(type, victim), type);
+    // Update the next victim index
+    BI_NEXTVICTIM(type) = (victim + 1) % BI_NBUFS(type) ;
 
-    /* Return index of allocated buffer element */
-    return victim;
+    // Delete the array index of the buffer element from the hashTable
+    e = edubfm_Delete(&BI_KEY(type, victim), type);
+    if (e < eNOERROR) ERR(e);
+
+    return(victim);
+
 }  /* edubfm_AllocTrain */

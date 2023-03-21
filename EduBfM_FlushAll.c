@@ -60,7 +60,18 @@ Four EduBfM_FlushAll(void)
     Two         i;                      /* index */
     Four        type;                   /* buffer type */
 
-    
+    /* Iterate over all buffer types */
+    for (type = 0; type < 2; type++) {
+        /* Iterate over all buffer elements */
+        for (i = 0; i < BI_NBUFS(type); i++) {
+            /* Check if the buffer element has the dirty bit set */
+            if (BI_BITS(type, i) & DIRTY) {
+                /* Write out the page/train to the disk */
+                e = edubfm_FlushTrain(&BI_KEY(type, i), type);
+                if (e < eNOERROR) ERR(e);
+            }
+        }
+    }
 
     return( eNOERROR );
     
