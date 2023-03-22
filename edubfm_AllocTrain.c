@@ -68,6 +68,7 @@ extern CfgParams_T sm_cfgParams;
  *     eNOUNFIXEDBUF_BFM - There is no unfixed buffer.
  *     some errors caused by fuction calls
  */
+
 Four edubfm_AllocTrain(
     Four 	type)			/* IN type of buffer (PAGE or TRAIN) */
 {
@@ -81,8 +82,9 @@ Four edubfm_AllocTrain(
 
     secondChanceCount = 0;
     victim = BI_NEXTVICTIM(type);
+
     /* Second chance buffer replacement algorithm */
-    while (secondChanceCount < 2 * BI_NBUFS(type) ) {
+    while (secondChanceCount < 2 * BI_NBUFS(type)) {
         if (BI_FIXED(type, victim) == 0) { // Unfixed buffer element found
             if (BI_BITS(type, victim) & REFER) { // REFER bit is set
                 BI_BITS(type, victim) &= ~REFER; // Reset REFER bit to 0
@@ -96,6 +98,12 @@ Four edubfm_AllocTrain(
 
     if (secondChanceCount >= 2 * BI_NBUFS(type) ) {
         ERR(eNOUNFIXEDBUF_BFM); // No unfixed buffer element found
+    }
+
+    if (BI_KEY(type, victim).pageNo == NIL) {
+        BI_BITS(type, victim) = 0;
+        BI_NEXTVICTIM(type) = (victim + 1) % BI_NBUFS(type);
+        return victim;
     }
 
     // If the buffer element is dirty, flush its contents to disk
